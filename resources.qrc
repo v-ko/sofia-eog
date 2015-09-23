@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>filter_configurations/raw_input_hw_0.filter</file>
+        <file>filter_configurations/raw_input_hw_1.filter</file>
+        <file>filter_configurations/sum_filter_15.filter</file>
+        <file>filter_configurations/sum_filter_50.filter</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,15 @@
+#This file defines a filter for the sofia-eog library
+#See the help on defining filters at FIXME
+
+#Static
+Exec=/usr/bin/arecord
+Arguments=-Dplug:hw:0 -f S16_LE -t raw -r OutputSampleRate
+Identifier=raw_input
+InputIdentifier=
+OutputSampleRate=8000
+SampleSize=2
+
+#Dynamic (can be changed by the program)
+RecordsToFile=0
+DisplaySampleRate=500
+IsEnabled=1

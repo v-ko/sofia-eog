@@ -1,0 +1,57 @@
+//izmisli layout-a --done
+//napravi go v ui --done
+//napravi izbiraneto na direktoriq za arhiva --done
+
+//filtrite 6te sa STDIN--filter->STDOUT . koito iska da npravi ne6to s nqkolko potoka - da si gi generira sam --done
+
+//populate records i filters da sa funkcii v EOGLibrary (da stava i za qml)--done
+//dopylni populate records --done
+//kyde 6te sa filtrite - pyrvona4alno vyv filters dir --done
+//napravi ui na arecord (koito trqbva da e vgraden) --done
+//>refresh devices list --done
+//>microphone list (moje napravo tuka da ima refresh entry) --done
+//>standartnite samplerate i t.n. --done
+//napravi populate funkciite za arecord 4astta (microphones) --done
+//default dir-a programata da si go pravi/re6ava --done
+//>new record funkciq v eoglib --done
+//>>create dir --done
+//izberi dir za filtrite ot qstandardpath QStandardPaths::ConfigLocation --done
+//napravi arecord .filter file-a --done
+//napravi klas filter --done
+//napravi q_property(filters) i update_filters --done
+//narejdane na filtrite v podhodq6t red --done
+//start recording funkciqta --done
+//set filter file --done
+//pipe data samo na checknatite --done
+//da izmislq pri selektirane na record kyde 6te se zarejdat nali4nite filtri --done
+//1vo za edini4na selekciq --done
+//start/stop recording butona --done
+//timer za pipeData --done
+//EOGLibrary::startFilter time of start file --done
+//test na raw input --done
+//BUG: timestampa ne go pi6e --done
+//add sample size property --done
+//addData za customplot-a --done
+//napravi .filter na sum filter-a --done
+//test&fix sum filter-a --done
+//connect gui buffer writes --done
+//Vizualizaciq : populatevane na QCustomPlot-ovete (s nqkakvi tvyrdi nastroiki) --done
+//fixed length s auto update --done
+//sym filter-a izpluiva bufera kato stane baq golqm taka 4e nqkyde ne se flush-va infoto --done
+//ima problemi s vkarvaneto/izkarvaneto na data. trqbva da e po-prozra4no kakyv vid info --done
+//se dviji. Testvai paralelno s kst plot kak izglejdat ne6tata --done
+//nai-ve4e !! napravi po-pedanti4no vsi4kite data operacii --done
+//test sum filter | naaaaai nakraq-29.05.2014--done
+//flush-a da e na slot ? mai prosto s formula --done
+//error stream-a na sum filter-a --done
+//4etene na starite zapisi --done
+//po-dobro razglejdane na starite zapisi (da replotva pri slider event) --done
+//da pokazva vremeto kakto trqbva --done
+//fix .filter resources --done
+//CLI za RPi i tihi zapisi --done
+//-------------16.09.2014---------------------------
+
+//record butona ne go gray-out-va --done
+//if the filter doesn't record on disk don't store it in the record--done
+//disable na opredeleni opcii pri record start --done
+//new record poziciq --done
