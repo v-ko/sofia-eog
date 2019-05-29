@@ -2,123 +2,121 @@
 #define EOGLIBRARY_H
 
 #include <QObject>
-//#include <QAudioDeviceInfo>
+#include <QDebug>
 #include <QTimer>
-
+#include <QSettings>
 #include "eogfilter.h"
+#include <QDir>
+
+class Record
+{
+public:
+    //Variables
+    QString name;
+    QList<EOGFilter*> filters;
+
+    //Functions
+    QString filledArgumentsListStringForFilter(EOGFilter * filter)
+    {
+        QString argumentsList_tmp = filter->argumentsListString;
+
+        //Set the input sample rate to the output rate of the parent
+        EOGFilter * inputFilter = getFilterByIdentifier(filter->inputIdentifier);
+        if(inputFilter!=nullptr){
+            argumentsList_tmp.replace(QRegExp("InputSampleRate"), QString::number(inputFilter->outputSampleRate) );
+        }
+        //Set the output sample rate
+        argumentsList_tmp.replace(QRegExp("OutputSampleRate"),QString::number(filter->outputSampleRate) );
+        //Set the flush frequency
+        if( (filter->flushFrequency>0) ){ //If the freq is set (!=0)
+            argumentsList_tmp.replace(QRegExp("FlushFrequency"),QString::number(filter->flushFrequency) );
+        }
+        return argumentsList_tmp;
+    }
+
+    EOGFilter * getFilterByIdentifier(QString identifier)
+    {
+        if(identifier.isEmpty()){
+            qDebug()<<"[Record "<<name<<"] No filter with identifier: "<<identifier;
+            return nullptr;
+        }
+
+        for(EOGFilter *filter: filters){
+            if( filter->identifier==identifier ) return filter;
+        }
+        qDebug()<<"[EOGLibrary::getFilterByIdentifier]No filter found with identifier:"<<identifier;
+        return nullptr;
+    }
+};
 
 class EOGLibrary : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(QString organizationName READ organizationName WRITE setOrganizationName NOTIFY organizationNameChanged)
-    Q_PROPERTY(QString applicationName READ applicationName WRITE setApplicationName NOTIFY applicationNameChanged)
-    Q_PROPERTY(QString applicationVersion READ applicationVersion WRITE setApplicationVersion NOTIFY applicationVersionChanged)
-
-    Q_PROPERTY(QString recordsFolder READ recordsFolder WRITE setRecordsFolder NOTIFY recordsFolderChanged)
-    Q_PROPERTY(QString defaultFiltersFolder READ defaultFiltersFolder WRITE setDefaultFiltersFolder NOTIFY defaultFiltersFolderChanged)
-    Q_PROPERTY(float flushDataFilesInterval READ flushDataFilesInterval WRITE setFlushDataFilesInterval NOTIFY flushDataFilesIntervalChanged)
-
-    Q_PROPERTY(QList<EOGRecord> recordsList READ recordsList WRITE setRecordsList NOTIFY recordsListChanged)
-    Q_PROPERTY(QList<EOGFilter*> defaultFiltersList READ defaultFiltersList WRITE setDefaultFiltersList NOTIFY defaultFiltersListChanged)
-    //Q_PROPERTY(QList<QAudioDeviceInfo> availableInputDevices READ availableInputDevices WRITE setAvailableInputDevices NOTIFY availableInputDevicesChanged)
-
-    //Q_PROPERTY(QString selectedRecord READ selectedRecord WRITE setSelectedRecord NOTIFY selectedRecordChanged)
-
 public:
-    explicit EOGLibrary(QString recordsFolder_, QString filtersFolder_);
-
-    struct EOGRecord{
-        QString name;
-        QList<EOGFilter*> filter;
-    };
-
-    //Properties
-    QString organizationName();
-    QString applicationName();
-    QString applicationVersion();
+    explicit EOGLibrary(QString recordsFolder_ = QString(), QString filtersFolder_ = QString());
 
     QString recordsFolder();
-    QString defaultFiltersFolder();
+    QString filtersFolder();
     float flushDataFilesInterval();
 
-    QList<EOGRecord> recordsList();
-    QList<EOGFilter*> defaultFiltersList();
-    //QList<QAudioDeviceInfo> availableInputDevices();
+    QList<EOGFilter*> filtersList(QString folder, QString recordsFolder);
 
     //Functions
     EOGFilter * getFilterByIdentifier(QString);
-    EOGRecord * getRecordByName(QString);
+    Record * getRecordByName(QString);
 
-    //Other
-    QString dateTimeFormat;
+    //Variables
+    QSettings settings;
+    QString dateTimeFormat = "yyyy.MM.dd HH:mm:ss.zzz";
 
 signals:
-    //Properties
-    void organizationNameChanged();
-    void applicationNameChanged();
-    void applicationVersionChanged();
-
-    void recordsFolderChanged(QString);
-    void defaultFiltersFolderChanged(QString);
     void flushDataFilesIntervalChanged(float);
-
     void recordsListChanged();
-    void defaultFiltersListChanged();
-    //void availableInputDevicesChanged();
 
     //Other
     void recordingStarted();
 
 public slots:
     //Set properties
-    void setOrganizationName(QString organizationName_);
-    void setApplicationName(QString applicationName_);
-    void setApplicationVersion(QString applicationVersion_);
-
     void setRecordsFolder(QString dir);
-    void setDefaultFiltersFolder(QString dir);
+    void setFiltersFolder(QString dir);
     void setFlushDataFilesInterval(float flushDataFilesInterval_);
 
-    void setRecordsList(QList<EOGRecord> recordsList_);
-    void setDefaultFiltersList(QList<EOGFilter*> defaultFiltersList_);
-    //void setAvailableInputDevices(QList<QAudioDeviceInfo> availableInputDevices_);
+    void setRecordsList(QList<Record> recordsList_);
 
     //Functions
     void updateRecordsList();
-    void updateDefaultFiltersList();
-    //void updateAvailableInputDevices();
+    void renameRecord(Record * record, QString newName){
+        //Rename the folder
+        QDir recordDir(QDir(recordsFolder()).filePath(record->name));
+        if( !recordDir.rename(recordDir.absolutePath(), QDir(recordsFolder()).filePath(newName)) ){
+            qDebug()<<"An error occured while trying to rename folder:"<<recordDir.absolutePath();
+        }
+        record->name = newName;
+        record->filters = filtersList(recordDir.absolutePath(), recordDir.absolutePath());
+        emit recordsListChanged();
+    }
 
-    EOGLibrary::EOGRecord * newRecord(QString recordName);
-    void startFilter(EOGFilter *filter);
+    Record * newRecord(QString recordName);
     void stopFilter(EOGFilter *filter);
     void startPipingData();
     void stopPipingData();
-    void startRecording();
+    void startRecording(QString recordName);
     void stopRecording();
 
     void restoreDefaultFilterConfigurations();
     void pipeData();
     void flushDataFilesBuffers();
 
-private:
-    //Properties
-    QString organizationName_m;
-    QString applicationName_m;
-    QString applicationVersion_m;
-
-    QList<EOGRecord> recordsList_m;
-    QList<EOGFilter*> defaultFiltersList_m;
-
-    //QList<QAudioDeviceInfo> availableInputDevices_m;
+public:
+    QList<Record> recordsList;
 
     //Variables
-    bool verboseOutput;
     QTimer pipeDataTimer, flushDataFilesTimer;
 
     //Functions
     QList<EOGFilter *> orderFilters(QList<EOGFilter *> filtersList_);
-    QString filledArgumentsListStringForFilter(EOGFilter *);    
 };
 
 #endif // EOGLIBRARY_H

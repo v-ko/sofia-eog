@@ -11,11 +11,9 @@ CONFIG   += console
 CONFIG   += static
 
 TARGET = sofia-eog_cli
-target.path = /home/pi/sofia-eog/bin
-target.files = /home/p10/Dropbox/Pepi/C++/sofia-eog/build-sofia-eog_cli-RPi-Release/sofia-eog_cli
-INSTALLS += target
-#TEMPLATE = app
 
+target.path = /sync/sofia-eog/bin
+INSTALLS += target
 
 SOURCES += main.cpp \
     ../eogfilter.cpp \

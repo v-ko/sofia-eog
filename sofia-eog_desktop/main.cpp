@@ -75,7 +75,7 @@
 //>Working directory - from the application
 
 //-------Info file parameters------------
-//Begginning of the record
+//Beginning of the record
 
 //======Other notes========
 //Only the filters defined in the filters directory will be visible
@@ -91,15 +91,13 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    //qDebug()<<"stufff";
-
     app.setOrganizationName("p10");
-    app.setApplicationName("sofia-eog-qt");
+    app.setApplicationName("sofia-qt");
     app.setApplicationVersion("0.0.1");
 
     //==============Command line parser===========================
     QCommandLineParser parser;
-    parser.setApplicationDescription("Qt GUI frontend for the sofia-eog library");
+    parser.setApplicationDescription("Qt frontend for the sofia stream tool");
     parser.addHelpOption();
     parser.addVersionOption();
 
@@ -124,17 +122,10 @@ int main(int argc, char *argv[])
     EOGLibrary lib(recordsFolder, filtersFolder);
     EOGWindow w(&app, &lib);
 
-    //Make connections
-    //QObject::connect(&lib,SIGNAL(availableInputDevicesChanged()),&w,SLOT(updateInputDevicesList()));
-    QObject::connect(&lib,SIGNAL(recordsListChanged()),&w,SLOT(updateRecordsList()));
-    QObject::connect(&lib,SIGNAL(defaultFiltersListChanged()),&w,SLOT(updateFilterUIbits()));
-
     //Initial info gathering
-    //lib.updateAvailableInputDevices();
-    lib.updateDefaultFiltersList();
     lib.updateRecordsList();
-    lib.setFlushDataFilesInterval(1); //TEST
-
+    lib.setFlushDataFilesInterval(60); //TEST
+    qDebug()<<"Starting";
     w.show();
 
     return app.exec();

@@ -86,6 +86,7 @@ void SumFilter::processData()
 
         if( float(rawSamplesProcessed)/intervalForFlushingTheBuffer >= flushesMade){
             stdoutFile.flush();
+            //qDebug()<<"Flushing";
             flushesMade++;
         }
 

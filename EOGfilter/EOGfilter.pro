@@ -12,8 +12,7 @@ CONFIG   += static
 
 TARGET = EOGfilter
 
-target.path = /home/pi/sofia-eog/bin
-target.files = /home/p10/Dropbox/Pepi/C++/EOGfilter/build-EOGfilter-RPi_5_3_3_static-Release/EOGfilter
+target.path = /sync/sofia-eog/bin
 INSTALLS += target
 
 SOURCES += main.cpp \

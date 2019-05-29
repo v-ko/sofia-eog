@@ -2,6 +2,7 @@
 #define EOGFILTERWIDGET_H
 
 #include <QWidget>
+#include <QTimer>
 
 #include "../eogfilter.h"
 
@@ -35,13 +36,14 @@ public slots:
 
     void emitFilterStartRequest();
 
-    void addBufferToData(QByteArray*buffer_);
+    void addBufferToQCPData(QByteArray*buffer_);
     void replot();
 private:
     //Properties
     EOGFilter * filter_m;
 
     //Variables
+    QTimer updateBufferStateTimer;
     double lastTimeStamp;
     double verticalRangeCenter;
     double verticalRangeSize;

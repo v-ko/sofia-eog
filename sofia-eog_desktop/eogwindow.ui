@@ -102,7 +102,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="filtersLayout">
+       <layout class="QVBoxLayout" name="contentLayout">
         <property name="sizeConstraint">
          <enum>QLayout::SetMaximumSize</enum>
         </property>
@@ -143,6 +143,28 @@
           </layout>
          </widget>
         </item>
+        <item>
+         <widget class="QScrollArea" name="scrollArea">
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="filtersScrollableWidget">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>718</width>
+             <height>351</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_8">
+            <item>
+             <layout class="QVBoxLayout" name="filtersLayout"/>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
        </layout>
       </item>
      </layout>
@@ -155,7 +177,7 @@
      <x>0</x>
      <y>0</y>
      <width>1000</width>
-     <height>29</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuOther">
@@ -199,22 +221,6 @@
     <hint type="destinationlabel">
      <x>137</x>
      <y>280</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>chooseFiltersButton</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>chooseFiltersFrame</receiver>
-   <slot>setVisible(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>396</x>
-     <y>91</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>396</x>
-     <y>298</y>
     </hint>
    </hints>
   </connection>
@@ -263,6 +269,22 @@
     <hint type="destinationlabel">
      <x>289</x>
      <y>249</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chooseFiltersButton</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>chooseFiltersFrame</receiver>
+   <slot>setVisible(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>396</x>
+     <y>91</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>396</x>
+     <y>298</y>
     </hint>
    </hints>
   </connection>

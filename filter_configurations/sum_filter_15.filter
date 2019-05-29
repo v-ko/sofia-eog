@@ -2,7 +2,7 @@
 #See the help on defining filters at FIXME
 
 #Static
-Exec=/home/p10/Dropbox/Pepi/C++/EOGfilter/build-EOGfilter-Desktop_Qt_5_2_1_GCC_64bit-Debug/EOGfilter
+Exec=/sync/sofia-eog/bin/EOGfilter
 Arguments=-i InputSampleRate -o OutputSampleRate -c 70 -f FlushFrequency
 Identifier=sum_filter
 InputIdentifier=raw_input

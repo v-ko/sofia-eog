@@ -76,7 +76,6 @@ int main(int argc, char *argv[])
 
     QString recordsFolder = parser.value(recordsFolderOption);
     QString filtersFolder = parser.value(filtersFolderOption);
-    float flushDataFilesInterval = parser.value(flushDataFilesIntervalOption).toFloat();
 
     QDir recordsDir(recordsFolder);
     QDir filtersDir(filtersFolder);
@@ -98,9 +97,7 @@ int main(int argc, char *argv[])
     EOGLibrary lib(recordsFolder, filtersFolder);
 
     //Set the interval on which to flush the buffers to file
-    if(lib.flushDataFilesInterval()!=flushDataFilesInterval){
-        lib.setFlushDataFilesInterval(flushDataFilesInterval);
-    }
+    lib.setFlushDataFilesInterval(parser.value(flushDataFilesIntervalOption).toFloat());
 
     //If the user wants to restore the default filters
     if(parser.isSet(restoreDefaultFiltersOption)){
@@ -109,14 +106,11 @@ int main(int argc, char *argv[])
 
     if(parser.isSet(printSettingsOption)){
         qDebug()<<"Records folder:"<<lib.recordsFolder();
-        qDebug()<<"Default filters folder:"<<lib.defaultFiltersFolder();
-        qDebug()<<"Flush data file interval:"<<lib.flushDataFilesInterval();
-        //qDebug<<"Records folder:"<<lib.recordsFolder();
+        qDebug()<<"Default filters folder:"<<lib.filtersFolder();
+        qDebug()<<"Flush data file interval:"<<lib.settings.value("flushDataFileInterval","60");
     }
 
     //Initial info gathering
-    //lib.updateAvailableInputDevices();
-    lib.updateDefaultFiltersList();
     lib.updateRecordsList();
 
     //Connections
@@ -124,7 +118,7 @@ int main(int argc, char *argv[])
 
     //Start recording
     if(parser.isSet(startOption)){
-        lib.startRecording();
+        lib.startRecording(QDateTime::currentDateTime().toString(lib.dateTimeFormat));
     }else{
         app.processEvents();
         app.exit();

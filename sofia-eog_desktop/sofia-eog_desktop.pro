@@ -7,9 +7,11 @@
 QT       += core gui multimedia printsupport
 CONFIG += c++11
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-
 TARGET = sofia-eog_desktop
+
+target.path = /sync/sofia-eog/bin
+INSTALLS += target
+
 TEMPLATE = app
 
 SOURCES += main.cpp\

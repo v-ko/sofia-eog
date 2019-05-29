@@ -28,7 +28,7 @@ EOGFilterWidget::EOGFilterWidget(EOGFilter *filter_, QWidget *parent, bool isPar
 
     ui->graphic->setInteraction(QCP::iRangeDrag, true);
     ui->graphic->setInteraction(QCP::iRangeZoom, true);
-    ui->graphic->axisRect()->setRangeDrag(Qt::Horizontal);
+    ui->graphic->axisRect()->setRangeDrag(Qt::Horizontal|Qt::Vertical);
     ui->graphic->axisRect()->setRangeZoom(Qt::Horizontal);
 
     verticalRangeCenter = 0;
@@ -36,8 +36,16 @@ EOGFilterWidget::EOGFilterWidget(EOGFilter *filter_, QWidget *parent, bool isPar
 
     setFilter(filter_);
 
-    connect(ui->startFilterButton,SIGNAL(clicked()),this,SLOT(emitFilterStartRequest()));
+    //connect(ui->startFilterButton,SIGNAL(clicked()),this,SLOT(emitFilterStartRequest()));
     connect(ui->verticalRangeSlider,SIGNAL(sliderMoved(int)),this,SLOT(replot()));
+
+    //Buffer UI setup
+    updateBufferStateTimer.setInterval(100);
+    connect(&updateBufferStateTimer,&QTimer::timeout,[&](){
+        ui->inputBufferProgressBar->setValue(filter_m->filterProcess.bytesAvailable());
+        ui->outputBufferProgressBar->setValue(filter_m->filterProcess.bytesToWrite());
+    });
+    updateBufferStateTimer.start();
 }
 
 EOGFilterWidget::~EOGFilterWidget()
@@ -59,23 +67,31 @@ void EOGFilterWidget::setFilter(EOGFilter * filter_)
 
     filter_m = filter_;
 
-    ui->recordsToFileCheckBox->setChecked(filter_m->recordsToFile());
-    ui->displaySampleRateLineEdit->setText(QString::number(filter_m->displaySampleRate()));
+    ui->recordsToFileCheckBox->setChecked(filter_m->recordsToFile);
+    ui->displaySampleRateLineEdit->setText(QString::number(filter_m->displaySampleRate));
+    if(filter_m->outputSampleRate==0) {
+        ui->enableDisplayingCheckBox->setCheckable(false);
+        ui->enableDisplayingCheckBox->setChecked(false);
+    }else{
+        ui->enableDisplayingCheckBox->setCheckable(true);
+        ui->enableDisplayingCheckBox->setChecked(true);
+    }
 
-    QFile file(filter_m->pathToDataFile());
+
+    QFile file(filter_m->pathToDataFile);
 
     if(file.exists()){ //FIXME dobavi progress bar za taq rabota (syotvetno dobavqne na chunk-ove
         file.open(QIODevice::ReadOnly);
         QByteArray tmpByteArray = file.readAll();
-        addBufferToData( &tmpByteArray );
+        addBufferToQCPData( &tmpByteArray );
         file.close();
 
     }
 
     connect(filter_m,SIGNAL(isStartedChanged(bool)),ui->startFilterButton,SLOT(setChecked(bool)));
-    connect(filter_m,SIGNAL(errorBufferChanged(QString)),ui->errorTextEdit,SLOT(append(QString)));
+    connect(filter_m,SIGNAL(errorBufferUpdated(QString)),ui->errorTextEdit,SLOT(append(QString)));
     connect(ui->recordsToFileCheckBox,SIGNAL(toggled(bool)),filter_m,SLOT(setRecordsToFile(bool)));
-    connect(filter_m,SIGNAL(outputBufferChanged(QByteArray*)),this,SLOT(addBufferToData(QByteArray*)));
+    connect(filter_m,SIGNAL(outputBufferUpdated(QByteArray*)),this,SLOT(addBufferToQCPData(QByteArray*)));
 
     emit filterChanged(filter_);
 }
@@ -85,7 +101,7 @@ void EOGFilterWidget::emitFilterStartRequest()
     emit filterStartRequest(filter_m);
 }
 
-void EOGFilterWidget::addBufferToData(QByteArray * buffer_)
+void EOGFilterWidget::addBufferToQCPData(QByteArray * buffer_)
 {
     if( !ui->enableDisplayingCheckBox->isChecked() ) return;
 
@@ -102,22 +118,22 @@ void EOGFilterWidget::addBufferToData(QByteArray * buffer_)
     if(lastTimeStamp!=0){
         sampleTime = lastTimeStamp;
     }else{
-        sampleTime= filter_m->firstSampleTime().toMSecsSinceEpoch()/1000; //it should be in secs so qcustomplot can use it
+        sampleTime= filter_m->firstSampleTime.toMSecsSinceEpoch()/1000; //it should be in secs so qcustomplot can use it
     }
-    double sampleTimeInterval = 1/filter_m->outputSampleRate(); //we're working in msecs (sample rate is in hz)
+    double sampleTimeInterval = 1/filter_m->outputSampleRate; //we're working in msecs (sample rate is in hz)
     unsigned int samplesToSkip=0;
 
-    if(filter_m->outputSampleRate()!=filter_m->displaySampleRate()){
-        samplesToSkip = filter_m->outputSampleRate()/filter_m->displaySampleRate();
+    if(filter_m->outputSampleRate!=filter_m->displaySampleRate){
+        samplesToSkip = filter_m->outputSampleRate/filter_m->displaySampleRate;
         //qDebug()<<"Reducing stream size by a factor of"<<samplesToSkip+1<<"for displaying.";
     }
 
     while(!buffer.atEnd()){
 
-        if(filter_m->sampleSize()==2){
+        if(filter_m->sampleSize==2){
             stream>>int16;
             sample = int16;
-        }else if(filter_m->sampleSize()==4){
+        }else if(filter_m->sampleSize==4){
             stream>>int32;
             sample = int32;
         }else{
@@ -125,7 +141,7 @@ void EOGFilterWidget::addBufferToData(QByteArray * buffer_)
         }
 
         //FIXME catch error here
-        stream.skipRawData(filter_m->sampleSize()*samplesToSkip);
+        stream.skipRawData(filter_m->sampleSize*samplesToSkip);
 
         ui->graphic->graph(0)->addData(sampleTime,sample);
         //qDebug()<<"Samples displayed:"<<sampleTime<<","<<sample;

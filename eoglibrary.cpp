@@ -1,59 +1,25 @@
 #include "eoglibrary.h"
 
 #include <QDir>
-#include <QSettings>
-#include <QDebug>
 #include <QStandardPaths>
 #include <QDateTime>
 
-EOGLibrary::EOGLibrary(QString recordsFolder_ = QString(), QString filtersFolder_ = QString())
+EOGLibrary::EOGLibrary(QString recordsFolder_, QString filtersFolder_):
+    settings("org.p10.sofia")
 {
-    //FOR TESTING
-    verboseOutput = true;
-
-    //Basic info
-    setOrganizationName("p10");
-    setApplicationName("sofia-eog-lib");
-    setApplicationVersion("0.0.1");
-
-    dateTimeFormat = "yyyy.MM.dd HH:mm:ss.zzz";
-
-    //If folders are entered - use them
-    if( !recordsFolder_.isEmpty() ){
-        setRecordsFolder(recordsFolder_);
-    }
-    if( !filtersFolder_.isEmpty() ){
-        setDefaultFiltersFolder(filtersFolder_);
-    }
+    setRecordsFolder(recordsFolder_);
+    setFiltersFolder(filtersFolder_);
 
     //Setup the timers
-    pipeDataTimer.setInterval(50);
+    pipeDataTimer.setInterval(settings.value("flushDataFileInterval","50").toFloat());
     connect(&pipeDataTimer,SIGNAL(timeout()),this,SLOT(pipeData()));
 
-    flushDataFilesTimer.setInterval(flushDataFilesInterval()*1000);
+    flushDataFilesTimer.setInterval(settings.value("flushDataFileInterval","60").toFloat()*1000);
     connect(&flushDataFilesTimer,SIGNAL(timeout()),this,SLOT(flushDataFilesBuffers()));
-
-    //If the filters list changes we need to update the records list (only available in the conf dir filters are valid)
-    connect(this,SIGNAL(defaultFiltersListChanged()),this,SLOT(updateRecordsList()));
-    connect(this,SIGNAL(recordsFolderChanged(QString)),this,SLOT(updateRecordsList()));
-}
-
-QString EOGLibrary::organizationName()
-{
-    return organizationName_m;
-}
-QString EOGLibrary::applicationName()
-{
-    return applicationName_m;
-}
-QString EOGLibrary::applicationVersion()
-{
-    return applicationVersion_m;
 }
 
 QString EOGLibrary::recordsFolder()
 {
-    QSettings settings(organizationName(),applicationName());
     QString dirStr = settings.value("records_folder","no_dir").toString();
     QDir dir(dirStr);
 
@@ -73,226 +39,147 @@ QString EOGLibrary::recordsFolder()
 
     return settings.value("records_folder").toString();
 }
-QString EOGLibrary::defaultFiltersFolder()
+QString EOGLibrary::filtersFolder()
 {
-    QSettings settings(organizationName(),applicationName());
-    QString dirStr = settings.value("filters_folder","no_dir").toString();
-    QDir dir(dirStr);
+    QDir dir(settings.value("filters_folder","no_dir").toString());
 
     //Fix if dir does not exist or is missing
-    if( (!dir.exists()) | dirStr.isEmpty() ){
-        qDebug()<<"[filtersFolder] The dir retrieved from QSettings does not exist:"<<dirStr;
-        dirStr = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)+"/"+applicationName();
-        setDefaultFiltersFolder( dirStr );
-        qDebug()<<"[filtersFolder] Saved "<<dirStr<<" to settings.";
-
-        dir.setPath(dirStr);
-        if(!dir.exists()){
-            qDebug()<<"[EOGLibrary::filtersFolder]The config dir is not present, creating it now.";
-            dir.mkpath(dirStr); //TODO catch error
-            //Install the .filter files
-            restoreDefaultFilterConfigurations();
-        }
+    if( (!dir.exists())){
+        qDebug()<<"[filtersFolder] The dir retrieved from QSettings does not exist:"<<dir.path();
     }
 
     return settings.value("filters_folder").toString();
 }
-float EOGLibrary::flushDataFilesInterval()
-{
-    QSettings settings(organizationName(),applicationName());
-    float flushDataFileInterval_ = settings.value("flushDataFileInterval","60").toFloat();
 
-    //Fix if there is a bad (negative) interval
-    if(flushDataFileInterval_<=0){
-        setFlushDataFilesInterval(60);
-        flushDataFileInterval_ = 60;
-        qDebug()<<"[EOGLibrary::flushDataFileInterval] The interval stored in the settings was invalid. Setting to 60.";
+QList<EOGFilter*> EOGLibrary::filtersList(QString filtersFolder, QString recordFolderPath)
+{
+    QDir dir( filtersFolder );
+    QList<EOGFilter*> filtersList_tmp;
+
+    //For every file in the record folder
+    for(QFileInfo entry: dir.entryInfoList(QDir::NoDotAndDotDot|QDir::AllEntries) ){
+
+        if( entry.isFile() && (entry.suffix()=="filter") ){
+            filtersList_tmp.push_back( new EOGFilter(dir.absoluteFilePath(entry.fileName()), recordFolderPath ) );
+        }else{
+            qDebug()<<"[EOGLibrary::filtersList]Unattended file/dir detected:"<<entry.fileName();
+            //TODO:add to unattended files
+        }
     }
 
-    return flushDataFileInterval_;
+    return filtersList_tmp;//orderFilters(filtersList_tmp);
 }
-
-QList<EOGLibrary::EOGRecord> EOGLibrary::recordsList()
-{
-    return recordsList_m;
-}
-QList<EOGFilter *> EOGLibrary::defaultFiltersList()
-{
-    return defaultFiltersList_m;
-}
-//QList<QAudioDeviceInfo> EOGLibrary::availableInputDevices()
-//{
-//    return availableInputDevices_m;
-//}
 
 //=============Public slots========================
-void EOGLibrary::setOrganizationName(QString organizationName_)
-{
-    organizationName_m = organizationName_;
-    emit organizationNameChanged();
-}
-void EOGLibrary::setApplicationName(QString applicationName_)
-{
-    applicationName_m = applicationName_;
-    emit applicationNameChanged();
-}
-void EOGLibrary::setApplicationVersion(QString applicationVersion_)
-{
-    applicationVersion_m = applicationVersion_;
-    emit applicationVersionChanged();
-}
 
-void EOGLibrary::setRecordsFolder(QString dir)
+void EOGLibrary::setRecordsFolder(QString dirPath)
 {
-    QSettings settings(organizationName(),applicationName());
+    QDir dir(dirPath);
 
-    QDir tmpDir(dir);
-
-    if(tmpDir.exists()){
-        qDebug()<<"[EOGLibrary::setRecordsFolder]Setting records folder to:"<<tmpDir.absolutePath();
-
-        settings.setValue("records_folder", tmpDir.absolutePath());
+    if(dir.exists()){
+        qDebug()<<"[EOGLibrary::setRecordsFolder]Setting records folder to:"<<dir.absolutePath();
+        settings.setValue("records_folder", dir.absolutePath());
         settings.sync();
-
-        emit recordsFolderChanged(tmpDir.absolutePath());
     }else{
-        qDebug()<<"[EOGLibrary::setRecordsFolder]The given dir does not exist.";
+        qDebug()<<"[EOGLibrary::setRecordsFolder]The given dir does not exist. Creating it.";
     }
 }
-void EOGLibrary::setDefaultFiltersFolder(QString dir)
+void EOGLibrary::setFiltersFolder(QString dirPath)
 {
-    QSettings settings(organizationName(),applicationName());
+    QDir dir(dirPath);
 
-    QDir tmpDir(dir);
-
-    if(tmpDir.exists()){
-        qDebug()<<"[EOGLibrary::setFiltersFolder]Setting default filters folder to:"<<tmpDir.absolutePath();
-
-        settings.setValue("filters_folder", tmpDir.absolutePath());
-        settings.sync();
-
-        emit defaultFiltersFolderChanged(tmpDir.absolutePath());
-    }else{
-        qDebug()<<"[EOGLibrary::setFiltersFolder]The given dir does not exist.";
+    if(!dir.exists()){
+        qDebug()<<"[EOGLibrary::setFiltersFolder]The given dir does not exist. Creating it.";
+        dir.mkpath(dirPath); //TODO catch error
+        //Install the .filter files
+        restoreDefaultFilterConfigurations();
     }
+    qDebug()<<"[EOGLibrary::setFiltersFolder]Setting default filters folder to:"<<dir.absolutePath();
+    settings.setValue("filters_folder", dir.absolutePath());
+    settings.sync();
 }
 void EOGLibrary::setFlushDataFilesInterval(float flushDataFilesInterval_)
 {
-    QSettings settings(organizationName(),applicationName());
+    qDebug()<<"[EOGLibrary::setFlushDataFileInterval]Setting flushDataFileInterval to:"<<flushDataFilesInterval_;
 
-    if(flushDataFilesInterval_>0){
-        qDebug()<<"[EOGLibrary::setFlushDataFileInterval]Setting flushDataFileInterval to:"<<flushDataFilesInterval_;
+    settings.setValue("flushDataFileInterval", flushDataFilesInterval_);
+    settings.sync();
 
-        settings.setValue("flushDataFileInterval", flushDataFilesInterval_);
-        settings.sync();
-
-        flushDataFilesTimer.setInterval(flushDataFilesInterval_*1000);
-        emit flushDataFilesIntervalChanged(flushDataFilesInterval_);
-    }else{
-        qDebug()<<"[EOGLibrary::setFlushDataFileInterval]The given interval is <=0.";
-    }
+    flushDataFilesTimer.setInterval(flushDataFilesInterval_*1000);
 }
 
-void EOGLibrary::setRecordsList(QList<EOGRecord> recordsList_)
+void EOGLibrary::setRecordsList(QList<Record> recordsList_)
 {
     //Delete the old list
-    for(EOGRecord record: recordsList_m){
-        for(EOGFilter* filter: record.filter){
+    for(Record record: recordsList){
+        for(EOGFilter* filter: record.filters){
             delete filter;
         }
     }
-    recordsList_m.clear();
+    recordsList.clear();
 
     //Copy the new list
-    recordsList_m = recordsList_;
+    recordsList = recordsList_;
     emit recordsListChanged();
 }
-void EOGLibrary::setDefaultFiltersList(QList<EOGFilter*> defaultFiltersList_)
-{
-    defaultFiltersList_m = defaultFiltersList_;
-    emit defaultFiltersListChanged();
-}
-/*void EOGLibrary::setAvailableInputDevices(QList<QAudioDeviceInfo> availableInputDevices_)
-{
-    availableInputDevices_m = availableInputDevices_;
-    emit availableInputDevicesChanged();
-}*/
 
 void EOGLibrary::updateRecordsList()
 {
     QDir dir( recordsFolder() );
-    QList<EOGRecord> recordsList_tmp;
+    QList<Record> recordsList_tmp;
 
-    for(QFileInfo entry: dir.entryInfoList(QDir::NoDotAndDotDot|QDir::AllEntries) ){
-
-        if( entry.isDir() ){
-            recordsList_tmp.push_back(EOGRecord());
-            recordsList_tmp.back().name = entry.fileName();
-            for(EOGFilter * filter: defaultFiltersList()){
-                recordsList_tmp.back().filter.push_back(new EOGFilter(filter, QDir(recordsFolder()).absoluteFilePath(recordsList_tmp.back().name)));
-            }
+    //Get all record folders
+    for(QFileInfo recordFolder: dir.entryInfoList(QDir::NoDotAndDotDot|QDir::AllEntries) ){
+        if( recordFolder.isDir() ){
+            recordsList_tmp.push_back(Record());
+            recordsList_tmp.back().name = recordFolder.fileName();
+            recordsList_tmp.back().filters = filtersList(recordFolder.absoluteFilePath(), recordFolder.absoluteFilePath());
 
         }else{
-            qDebug()<<"[EOGLibrary::updateRecordsList]Unattended file detected:"<<entry.fileName();
+            qDebug()<<"[EOGLibrary::updateRecordsList]Unattended file detected:"<<recordFolder.fileName();
             //TODO:add to unattended files
         }
     }
 
     setRecordsList(recordsList_tmp);
 }
-void EOGLibrary::updateDefaultFiltersList()
+
+Record * EOGLibrary::newRecord(QString recordName)
 {
-    QDir dir( defaultFiltersFolder() );
-    QList<EOGFilter*> filtersList_tmp;
-
-    for(EOGFilter* filter: defaultFiltersList() ) delete filter; //clear filters
-
-    for(QFileInfo entry: dir.entryInfoList(QDir::NoDotAndDotDot|QDir::AllEntries) ){
-
-        if( entry.isFile() && (entry.suffix()=="filter") ){
-            filtersList_tmp.push_back( new EOGFilter(dir.absoluteFilePath(entry.fileName()) ) );
-        }else{
-            qDebug()<<"[EOGLibrary::updateFiltersList]Unattended dir detected:"<<entry.fileName();
-            //TODO:add to unattended files
-        }
-    }
-
-    setDefaultFiltersList( orderFilters(filtersList_tmp) );
-}
-/*void EOGLibrary::updateAvailableInputDevices()
-{
-    setAvailableInputDevices( QAudioDeviceInfo::availableDevices(QAudio::AudioInput) );
-}*/
-
-EOGLibrary::EOGRecord * EOGLibrary::newRecord(QString recordName)
-{
-    EOGLibrary::EOGRecord * record;
+    Record * record;
     QDir dir(recordsFolder());
 
     if( recordName.isEmpty() ){
         qDebug()<<"[EOGLibrary::newRecord]No recordName specified.";
-        return NULL;
-    }else if( getRecordByName(recordName)!=NULL ){
+        return nullptr;
+    }else if( getRecordByName(recordName)!=nullptr ){
         qDebug()<<"[EOGLibrary::newRecord]This name is already in use:"<<recordName;
-        return NULL;
+        return nullptr;
+
+    //Create the records dir and filter files
     }else if( dir.mkdir(recordName) ){
+
         updateRecordsList();
         record = getRecordByName(recordName);
-        if(record==NULL){
+        record->filters = filtersList(filtersFolder(), dir.filePath(recordName));
+        for(EOGFilter *f: record->filters){
+            f->saveFilterConfig();
+        }
+        updateRecordsList();
+        record = getRecordByName(recordName);
+
+        if(record==nullptr){
             qDebug()<<"[EOGLibrary::newRecord]Failed to fetch record after creating it:"<<recordName;
-            return NULL;
+            return nullptr;
         }else{
+            qDebug()<<"[EOGLibrary::newRecord]Created record:"<<recordName;
             emit recordsListChanged();
             return record;
         }
     }else{
         qDebug()<<"[EOGLibrary::newRecord]Failed to create the folder.";
-        return NULL;
+        return nullptr;
     }
-}
-void EOGLibrary::startFilter(EOGFilter * filter)
-{
-    filter->start(filledArgumentsListStringForFilter(filter));
 }
 void EOGLibrary::stopFilter(EOGFilter *filter)
 {
@@ -308,17 +195,17 @@ void EOGLibrary::stopPipingData()
     pipeDataTimer.stop();
     flushDataFilesTimer.stop();
 }
-void EOGLibrary::startRecording()
+void EOGLibrary::startRecording(QString recordName)
 {
-    QString recordName = QDateTime::currentDateTime().toString(dateTimeFormat);
-
     //Create the new record dir
-    EOGRecord * record = newRecord(recordName);
-    if( record!=NULL ){
+    Record * record = getRecordByName(recordName);
+    if(record==nullptr) record = newRecord(recordName);
 
-        for(EOGFilter *filter: record->filter){
-            if(filter->isEnabled()){
-                filter->start(filledArgumentsListStringForFilter(filter));
+    if( record!=nullptr ){
+
+        for(EOGFilter *filter: record->filters){
+            if(filter->isEnabled){
+                filter->start(record->filledArgumentsListStringForFilter(filter));
             }
         }
 
@@ -331,12 +218,16 @@ void EOGLibrary::startRecording()
 }
 void EOGLibrary::stopRecording()
 {
-    for(EOGFilter *filter: defaultFiltersList_m){
-        if(filter->isStarted()){
-            filter->stop();
-            pipeData();
+    //Brute force stop of everything
+    for(Record record: recordsList){
+        for(EOGFilter *filter: record.filters){
+            if(filter->isStarted()){
+                filter->stop();
+                //pipeData();
+            }
         }
     }
+
     stopPipingData();
 
     qDebug()<<"[EOGLibrary::stopRecording]Stopped recording";
@@ -344,7 +235,7 @@ void EOGLibrary::stopRecording()
 
 void EOGLibrary::restoreDefaultFilterConfigurations()
 {
-    QDir internalFiltersDir(":/filter_configurations"), filtersDir=defaultFiltersFolder();
+    QDir internalFiltersDir(":/filter_configurations"), filtersDir=filtersFolder();
     if( !internalFiltersDir.isReadable() ){
         qDebug()<<"[EOGLibrary::restoreDefaultFilterConfigurations]The internal filters dir is not readable:"<<internalFiltersDir.absolutePath();
     }
@@ -369,25 +260,24 @@ void EOGLibrary::restoreDefaultFilterConfigurations()
             QFile(filtersDir.absoluteFilePath(defaultFilter)).setPermissions(QFile::ReadOwner | QFile::WriteOwner);
         }
     }
-    updateDefaultFiltersList();
 }
 
 QList<EOGFilter *> EOGLibrary::orderFilters(QList<EOGFilter*> filtersList_)
 {
-    QList<EOGFilter*> filterList_processed,filterList_left = filtersList_,filterList_leftBackup;
+    QList<EOGFilter*> filterList_processed, filterList_left = filtersList_, filterList_leftBackup;
 
-    //Find filters with no input
+    //Find root nodes (no input set)
+    int filtersFound = 0;
     for(EOGFilter *filter: filterList_left)
     {
-        if(filter->inputIdentifier().isEmpty()){
+        if(filter->inputIdentifier.isEmpty()){
             filterList_processed.push_back(filter);
             filterList_left.removeOne(filter);
+            filtersFound++;
         }
     }
 
     //Then try to queue everything else
-    int filtersFound = 1; //not to break the while loop
-
     filterList_leftBackup = filterList_left;
 
     while(filtersFound>0){ //If there's none that connects with the tree - we're finished (those left are considered broken)
@@ -398,7 +288,7 @@ QList<EOGFilter *> EOGLibrary::orderFilters(QList<EOGFilter*> filtersList_)
         for(EOGFilter *filter: filterList_leftBackup)
         {
             for(EOGFilter *processedFilter: filterList_processed){
-                if(processedFilter->identifier()==filter->inputIdentifier()){
+                if(processedFilter->identifier==filter->inputIdentifier){
                     filterList_processed.push_back(filter);
                     filterList_left.removeOne(filter);
                     break;
@@ -410,8 +300,9 @@ QList<EOGFilter *> EOGLibrary::orderFilters(QList<EOGFilter*> filtersList_)
     }//wend
 
     for(EOGFilter *filter: filterList_left){
-        qDebug()<<"[EOGLibrary::orderFilters]Filter"<<filter->identifier()<<"is not properly connected to the pipe.";
-        delete filter;
+        qDebug()<<"[EOGLibrary::orderFilters]Filter"<<filter->identifier<<"has no connection to a root node, adding to list anyway.";
+        filterList_processed.push_back(filter);
+        filterList_left.removeOne(filter);
     }
 
     return filterList_processed;
@@ -425,41 +316,41 @@ void EOGLibrary::pipeData()
     //qDebug()<<"Piping data";
 
     //Parse outputs
-    for(EOGRecord record: recordsList()){
-        for(EOGFilter * filter: record.filter){
+    for(Record record: recordsList){
+        for(EOGFilter * filter: record.filters){
 
             if( !filter->isStarted() ) continue;
 
             //Get the output in a buffer
-            if(filter->filterProcess()->bytesAvailable()>0){
-                buffer = new QByteArray(filter->filterProcess()->readAllStandardOutput()) ; //test it without the constructor
+            if(filter->filterProcess.bytesAvailable()>0){
+                buffer = new QByteArray(filter->filterProcess.readAllStandardOutput()) ; //test it without the constructor
 
                 if(!buffer->isEmpty()){
                     //Push it to every filter that wants this output
-                    for(EOGFilter *targetFilter: record.filter){
+                    for(EOGFilter *targetFilter: record.filters){
                         if( !targetFilter->isStarted() ) continue; //only if the filter is started
 
-                        if( targetFilter->inputIdentifier()==filter->identifier() ){
+                        if( targetFilter->inputIdentifier==filter->identifier ){
 
-                            bytesWritten = targetFilter->filterProcess()->write(buffer->data(),buffer->size());
+                            bytesWritten = targetFilter->filterProcess.write(buffer->data(),buffer->size());
                             if( bytesWritten<0 ){
-                                qDebug()<<"[EOGLibrary::pipeData]Failed to write the buffer to the targetFilter:"<<targetFilter->configurationFilePath();
+                                qDebug()<<"[EOGLibrary::pipeData]Failed to write the buffer to the targetFilter:"<<targetFilter->configurationFilePath;
                             }else{ //if the write is good
-                                //qDebug()<<"Bytes written to"<<filter->name()<<":"<<bytesWritten;
+                                //qDebug()<<"Bytes written to"<<filter->name<<":"<<bytesWritten;
                             }
                         }
                     }
 
                     //Save the buffer for yourself
-                    filter->setOutputBuffer(buffer);
+                    filter->updateOutputBuffer(buffer);
                 }
             }//end if bytes available
 
             //Get the errors
-            buffer = new QByteArray( filter->filterProcess()->readAllStandardError() );
+            buffer = new QByteArray( filter->filterProcess.readAllStandardError() );
             if(buffer->size()>0){
-                filter->setErrorBuffer(QString(*buffer));
-                qDebug()<<"[EOGLibrary::pipeData]Error buffer for filter"<<filter->name()<<":"<<*buffer;
+                filter->updateErrorBuffer(QString(*buffer));
+                qDebug()<<"[EOGLibrary::pipeData]Error buffer for filter"<<filter->name<<":"<<*buffer;
             }
             delete buffer;
         }
@@ -468,8 +359,8 @@ void EOGLibrary::pipeData()
 }
 void EOGLibrary::flushDataFilesBuffers()
 {
-    for(EOGRecord record: recordsList()){
-        for(EOGFilter * filter: record.filter){
+    for(Record record: recordsList){
+        for(EOGFilter * filter: record.filters){
 
             if( !filter->isStarted() ) continue;
 
@@ -478,40 +369,13 @@ void EOGLibrary::flushDataFilesBuffers()
     }
 }
 
-QString EOGLibrary::filledArgumentsListStringForFilter(EOGFilter * filter)
-{
-    QString argumentsList_tmp = filter->argumentsListString();
 
-    //Set the input sample rate to the output rate of the parent
-    EOGFilter * inputFilter = getFilterByIdentifier(filter->inputIdentifier());
-    if(inputFilter!=NULL){
-        argumentsList_tmp.replace(QRegExp("InputSampleRate"), QString::number(inputFilter->outputSampleRate()) );
-    }
-    //Set the output sample rate
-    argumentsList_tmp.replace(QRegExp("OutputSampleRate"),QString::number(filter->outputSampleRate()) );
-    //Set the flush frequency
-    if( (filter->flushFrequency()!=0) ){ //If the freq is set (!=0)
-        argumentsList_tmp.replace(QRegExp("FlushFrequency"),QString::number(filter->flushFrequency()) );
-    }
-    return argumentsList_tmp;
-}
-
-EOGFilter * EOGLibrary::getFilterByIdentifier(QString identifier)
+Record * EOGLibrary::getRecordByName(QString name)
 {
-    if(identifier.isEmpty()) return NULL;
-
-    for(EOGFilter * filter: defaultFiltersList()){
-        if( filter->identifier()==identifier ) return filter;
-    }
-    qDebug()<<"[EOGLibrary::getFilterByIdentifier]No filter found with identifier:"<<identifier;
-    return NULL;
-}
-EOGLibrary::EOGRecord * EOGLibrary::getRecordByName(QString name)
-{
-    for(int i=0;i<recordsList_m.size();i++){
-        EOGRecord *record = &recordsList_m[i];
+    for(int i=0;i<recordsList.size();i++){
+        Record *record = &recordsList[i];
         if(record->name==name) return record;
     }
-    //qDebug()<<"[EOGLibrary::getRecordByName]Could not get record with name:"<<name;
-    return NULL;
+    qDebug()<<"[EOGLibrary::getRecordByName]Could not get record with name:"<<name;
+    return nullptr;
 }
