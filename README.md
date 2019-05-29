@@ -33,16 +33,17 @@ IsEnabled=1
 Then you can route the input to a second filter. I used the example as pretty much a low pass filter for the EOG sensor data (it's included in the code base):
 ```
 #Static
-Exec=/usr/bin/arecord
-Arguments=-Dplug:hw:1 -f S16_LE -t raw -r OutputSampleRate
-Identifier=raw_input
-InputIdentifier=
-OutputSampleRate=8000
-SampleSize=2
+Exec=/path/to/build/folder/bin/EOGfilter
+Arguments=-i InputSampleRate -o OutputSampleRate -c 70 -f FlushFrequency
+Identifier=sum_filter
+InputIdentifier=raw_input
+OutputSampleRate=500
+SampleSize=4
 
 #Dynamic (can be changed by the program)
 RecordsToFile=0
 DisplaySampleRate=500
+FlushFrequency=500
 IsEnabled=0
 ```
 ### Current status and future of the app
