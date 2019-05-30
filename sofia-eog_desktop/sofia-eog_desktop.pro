@@ -20,14 +20,14 @@ SOURCES += main.cpp\
     ../eogfilter.cpp \
     ../petko10q.cpp \
     eogfilterwidget.cpp \
-    ../../../QCustomPlot/qcustomplot.cpp
+    qcustomplot.cpp
 
 HEADERS  += eogwindow.h \
     ../eoglibrary.h \
     ../eogfilter.h \
     ../petko10q.h \
     eogfilterwidget.h \
-    ../../../QCustomPlot/qcustomplot.h
+    qcustomplot.h
 
 FORMS    += eogwindow.ui \
     eogfilterwidget.ui
