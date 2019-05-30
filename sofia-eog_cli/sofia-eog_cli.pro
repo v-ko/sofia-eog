@@ -18,12 +18,12 @@ INSTALLS += target
 SOURCES += main.cpp \
     ../eogfilter.cpp \
     ../eoglibrary.cpp \
-    ../../../petko10q.cpp
+    ../petko10q.cpp
 
 HEADERS += \
     ../eogfilter.h \
     ../eoglibrary.h \
-    ../../../petko10q.h
+    ../petko10q.h
 
 RESOURCES += \
     ../resources.qrc

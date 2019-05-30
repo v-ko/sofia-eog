@@ -5,7 +5,7 @@
 #include <QDir>
 #include <QDebug>
 
-#include "../../petko10q.h"
+#include "../petko10q.h"
 
 EOGFilter::EOGFilter(QString configurationFilePath_, QString recordFolderPath):
     configurationFilePath(configurationFilePath_)
